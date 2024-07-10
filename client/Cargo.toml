@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 coap = "0.17.0"
 coap-lite = "0.12.0"
+rcgen = "0.11.1"
 rustls = "0.21.7"
 rustls-pemfile = "2.0.0"
 serde = "1.0.203"

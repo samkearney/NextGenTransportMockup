@@ -281,6 +281,7 @@ version = "0.1.0"
 dependencies = [
  "coap 0.17.0",
  "coap-lite 0.12.0",
+ "rcgen 0.11.3",
  "rustls",
  "rustls-pemfile",
  "serde",
