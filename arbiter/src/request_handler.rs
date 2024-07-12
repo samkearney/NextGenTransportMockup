@@ -6,7 +6,7 @@ use serde::Deserialize;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::channel as oneshot_channel;
 
-use crate::request::{ApiDevice, Request, RequestType};
+use crate::request::{ApiDevice, ControlTokenRequest, Request, RequestType};
 
 pub struct RequestHandler {
     tx: Sender<Request>,
@@ -40,16 +40,10 @@ impl coap::server::RequestHandler for RequestHandler {
             };
 
             match request.get_method() {
-                &Method::Get => println!("request by get {}", request.get_path()),
-                &Method::Post => println!(
-                    "request by post {}",
-                    String::from_utf8(request.message.payload.clone()).unwrap()
-                ),
-                &Method::Put => println!(
-                    "request by put {}",
-                    String::from_utf8(request.message.payload.clone()).unwrap()
-                ),
-                _ => println!("request by other method"),
+                &Method::Get => println!("handling: GET /{}", request.get_path()),
+                &Method::Post => println!("handling: POST /{}", request.get_path(),),
+                &Method::Put => println!("handling: PUT /{}", request.get_path()),
+                _ => println!("Ignoring request with unknown method"),
             };
 
             let path = request.get_path_as_vec().unwrap();
@@ -80,8 +74,24 @@ impl coap::server::RequestHandler for RequestHandler {
                         label: payload.label,
                         manufacturer: payload.manufacturer,
                         model: payload.model,
+                        port: payload.port,
                         ttl: payload.ttl,
                     })
+                }
+                (&Method::Get, &["controlToken"]) => {
+                    let payload = match serde_json::from_slice::<ControlTokenRequest>(
+                        &request.message.payload,
+                    ) {
+                        Ok(payload) => payload,
+                        Err(e) => {
+                            request.apply_from_error(HandlingError::bad_request(format!(
+                                "Couldn't parse payload of GET /controlToken: {e}"
+                            )));
+                            return request;
+                        }
+                    };
+
+                    RequestType::ControlToken(payload)
                 }
                 (_, _) => {
                     request.apply_from_error(HandlingError::not_found());
@@ -114,5 +124,6 @@ struct PutDevicePayload {
     label: String,
     manufacturer: String,
     model: String,
+    port: u16,
     ttl: u64,
 }

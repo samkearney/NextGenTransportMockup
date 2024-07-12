@@ -1,7 +1,7 @@
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use coap_lite::{error::HandlingError, CoapRequest};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender as OneshotSender;
 use uuid::Uuid;
 
@@ -38,6 +38,7 @@ impl Request {
 pub enum RequestType {
     Register(ApiDevice),
     List,
+    ControlToken(ControlTokenRequest),
     Shutdown,
 }
 
@@ -47,12 +48,28 @@ pub struct ApiDevice {
     pub label: String,
     pub manufacturer: String,
     pub model: String,
+    pub port: u16,
     pub ttl: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlTokenRequest {
+    pub cid: Uuid,
+    pub devices: Vec<Uuid>,
+    pub params_read: Vec<String>,
+    pub params_write: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ControlTokenResponse {
+    pub tokens: HashMap<Uuid, String>,
 }
 
 pub enum Response {
     Ok,
     ListResponse(ListResponse),
+    ControlTokenResponse(ControlTokenResponse),
     Error(HandlingError),
 }
 
@@ -71,6 +88,9 @@ impl Response {
             Response::Ok => {}
             Response::ListResponse(list) => {
                 resp.message.payload = serde_json::to_vec(&list.devices).unwrap();
+            }
+            Response::ControlTokenResponse(payload) => {
+                resp.message.payload = serde_json::to_vec(&payload).unwrap();
             }
             Response::Error(e) => {
                 message.apply_from_error(e);
