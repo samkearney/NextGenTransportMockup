@@ -1,5 +1,5 @@
 [package]
-name = "client"
+name = "controller"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
+base64 = "0.22.1"
 coap = "0.18.0"
 coap-lite = "0.11.3"
 env_logger = "0.11.3"

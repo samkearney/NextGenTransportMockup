@@ -105,6 +105,7 @@ impl coap::server::RequestHandler for RequestHandler {
                     ) {
                         Ok(data) => data,
                         Err(e) => {
+                            println!("Error decoding control token: {e}");
                             request.apply_from_error(HandlingError::bad_request(format!(
                                 "Couldn't decode JWT: {e}"
                             )));

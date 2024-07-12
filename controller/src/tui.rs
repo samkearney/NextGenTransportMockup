@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::net::ToSocketAddrs;
 use std::{collections::HashMap, io};
 
+use base64::{engine::general_purpose::URL_SAFE, Engine};
 use coap::request::MessageClass;
 use coap::{
     client::CoAPClient,
@@ -90,6 +91,16 @@ struct SetParamPayload {
     value: String,
 }
 
+#[derive(Deserialize, Serialize)]
+struct JwtClaims {
+    iss: String,
+    sub: String,
+    aud: String,
+    exp: u64,
+    params_read: Vec<String>,
+    params_write: Vec<String>,
+}
+
 pub fn run_tui(config: DtlsConfig, my_cid: Uuid, runtime: tokio::runtime::Runtime) {
     println!("NextGen Transport Controller");
     println!("Available commands:");
@@ -99,10 +110,13 @@ pub fn run_tui(config: DtlsConfig, my_cid: Uuid, runtime: tokio::runtime::Runtim
     println!("      syntax: g [device_index] [parameter]");
     println!("  s: Set param value on device");
     println!("      syntax: s [device_index] [parameter] [value]");
+    println!("  f: Attempt to set param value on device_index_b using token for device_index_a");
+    println!("      syntax: s [device_index_a] [device_index_b] [parameter] [value]");
     println!("  p: Print current devices");
     println!("  q: Quit");
 
     let gs_regex = regex::Regex::new(r"^([gs]) (\d+) ([\w\-_]+)( [^\s]+)?$").unwrap();
+    let f_regex = regex::Regex::new(r"^f (\d+) (\d+) ([\w\-_]+) ([^\s]+)$").unwrap();
 
     let mut client: Option<CoAPClient<DtlsConnection>> = None;
     let mut current_devices: Vec<Device> = vec![];
@@ -149,6 +163,11 @@ pub fn run_tui(config: DtlsConfig, my_cid: Uuid, runtime: tokio::runtime::Runtim
                 };
 
                 let request_type: RequestType = captures.get(1).unwrap().as_str().into();
+                if request_type == RequestType::Put && captures.get(4).is_none() {
+                    println!("Invalid syntax");
+                    continue;
+                }
+
                 let device_index = captures.get(2).unwrap().as_str();
                 let Ok(device_index) = device_index.parse::<usize>() else {
                     println!("Invalid device index");
@@ -217,6 +236,91 @@ pub fn run_tui(config: DtlsConfig, my_cid: Uuid, runtime: tokio::runtime::Runtim
                     }
                     Err(e) => {
                         println!("Failed to execute {request_type} request: {e}");
+                    }
+                }
+            }
+            'f' => {
+                let Some(captures) = f_regex.captures(&line) else {
+                    println!("Invalid syntax");
+                    continue;
+                };
+
+                let device_index_a = captures.get(1).unwrap().as_str();
+                let Ok(device_index_a) = device_index_a.parse::<usize>() else {
+                    println!("Invalid device index");
+                    continue;
+                };
+
+                if device_index_a > current_devices.len() {
+                    println!("Invalid device index");
+                    continue;
+                }
+
+                let device_index_b = captures.get(2).unwrap().as_str();
+                let Ok(device_index_b) = device_index_b.parse::<usize>() else {
+                    println!("Invalid device index");
+                    continue;
+                };
+
+                if device_index_b > current_devices.len() {
+                    println!("Invalid device index");
+                    continue;
+                }
+
+                let parameter = captures.get(3).unwrap().as_str();
+                let value = captures.get(4).unwrap().as_str();
+
+                let Some(ref client) = client else {
+                    println!("Not connected to Arbiter");
+                    continue;
+                };
+
+                let device_a = &current_devices[device_index_a];
+                let device_b = &current_devices[device_index_b];
+
+                let token = request_control_token(
+                    client,
+                    &runtime,
+                    &my_cid,
+                    device_a,
+                    vec![],
+                    vec![parameter.to_string()],
+                );
+
+                let token = match token {
+                    Ok(token) => token,
+                    Err(err) => {
+                        println!("Failed to get control token: {err}");
+                        continue;
+                    }
+                };
+
+                println!("Got control token for device {device_index_a}.");
+                println!("Changing audience in token to CID of device {device_index_b}... >:)");
+                let token = tamper_with_token(
+                    token.tokens.get(&device_a.cid).unwrap(),
+                    device_b.cid.to_string(),
+                );
+
+                println!("Sending PUT /{parameter}...");
+
+                match send_request(
+                    config.clone(),
+                    &runtime,
+                    RequestType::Put,
+                    device_b.port,
+                    token,
+                    parameter,
+                    Some(value.to_string()),
+                ) {
+                    Ok(Some(result)) => {
+                        println!("Got GET result: {result}");
+                    }
+                    Ok(None) => {
+                        println!("SET successfully");
+                    }
+                    Err(e) => {
+                        println!("Failed to execute PUT request: {e}");
                     }
                 }
             }
@@ -335,7 +439,36 @@ fn send_request(
     let response = runtime.block_on(async move { client.send(request).await })?;
 
     match request_type {
-        RequestType::Get => Ok(Some(String::from_utf8(response.message.payload)?)),
-        RequestType::Put => Ok(None),
+        RequestType::Get => {
+            if let MessageClass::Response(ResponseType::Content) = response.message.header.code {
+                Ok(Some(String::from_utf8(response.message.payload)?))
+            } else {
+                Err(anyhow::anyhow!(
+                    String::from_utf8(response.message.payload).unwrap()
+                ))
+            }
+        }
+        RequestType::Put => {
+            if let MessageClass::Response(ResponseType::Content) = response.message.header.code {
+                Ok(None)
+            } else {
+                Err(anyhow::anyhow!(
+                    String::from_utf8(response.message.payload).unwrap()
+                ))
+            }
+        }
     }
+}
+
+fn tamper_with_token(token: &str, new_audience: String) -> String {
+    let token_parts: Vec<&str> = token.split('.').collect();
+    let payload_decoded = URL_SAFE.decode(token_parts[1].as_bytes()).unwrap();
+    let mut payload_decoded: JwtClaims =
+        serde_json::from_str(&String::from_utf8(payload_decoded).unwrap()).unwrap();
+
+    payload_decoded.aud = new_audience; // >:)
+
+    let payload_encoded = serde_json::to_string(&payload_decoded).unwrap();
+    let payload_encoded = URL_SAFE.encode(payload_encoded.as_bytes());
+    format!("{}.{}.{}", token_parts[0], payload_encoded, token_parts[2])
 }

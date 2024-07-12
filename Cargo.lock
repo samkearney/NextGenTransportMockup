@@ -334,26 +334,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "coap 0.18.0",
- "coap-lite",
- "env_logger",
- "log",
- "rcgen 0.11.3",
- "regex",
- "rustls",
- "rustls-pemfile",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
- "webrtc-dtls",
-]
-
-[[package]]
 name = "coap"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -440,6 +420,27 @@ name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
+
+[[package]]
+name = "controller"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "coap 0.18.0",
+ "coap-lite",
+ "env_logger",
+ "log",
+ "rcgen 0.11.3",
+ "regex",
+ "rustls",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "webrtc-dtls",
+]
 
 [[package]]
 name = "cpufeatures"
