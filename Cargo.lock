@@ -122,7 +122,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "coap 0.18.0",
- "coap-lite 0.11.5",
+ "coap-lite",
  "env_logger",
  "jsonwebtoken",
  "log",
@@ -338,8 +338,8 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "coap 0.17.0",
- "coap-lite 0.12.0",
+ "coap 0.18.0",
+ "coap-lite",
  "env_logger",
  "log",
  "rcgen 0.11.3",
@@ -360,7 +360,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373acd8d911ed9b301b386ba13e69da2ccbe56cc3b87db1c7938acd1a9f5b3cb"
 dependencies = [
  "async-trait",
- "coap-lite 0.11.5",
+ "coap-lite",
  "futures",
  "log",
  "pkcs8",
@@ -385,7 +385,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0899d1042890b4a883bc614e048aec513784e9fa422578d4d18b7b21f3201dc0"
 dependencies = [
  "async-trait",
- "coap-lite 0.11.5",
+ "coap-lite",
  "futures",
  "log",
  "pkcs8",
@@ -408,17 +408,6 @@ name = "coap-lite"
 version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d72f4fbcb650652c4b7d980390cf8af49a738422ac66718bd516ec3430b83a6"
-dependencies = [
- "coap-message 0.2.3",
- "coap-message 0.3.2",
- "lru_time_cache",
-]
-
-[[package]]
-name = "coap-lite"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d1004f926f745b125c4e5d7b650cfbb07580d70a508870a9d7b53019b96d241"
 dependencies = [
  "coap-message 0.2.3",
  "coap-message 0.3.2",
@@ -463,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "create-certs"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "rcgen 0.13.1",
  "time",
@@ -574,7 +563,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "coap 0.17.0",
- "coap-lite 0.11.5",
+ "coap-lite",
  "env_logger",
  "jsonwebtoken",
  "log",

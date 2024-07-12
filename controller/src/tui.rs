@@ -2,11 +2,13 @@ use std::fmt::Display;
 use std::net::ToSocketAddrs;
 use std::{collections::HashMap, io};
 
+use coap::request::MessageClass;
 use coap::{
     client::CoAPClient,
     dtls::{DtlsConnection, UdpDtlsConfig},
     request::{Method, RequestBuilder},
 };
+use coap_lite::ResponseType;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use webrtc_dtls::config::Config as DtlsConfig;
@@ -100,7 +102,7 @@ pub fn run_tui(config: DtlsConfig, my_cid: Uuid, runtime: tokio::runtime::Runtim
     println!("  p: Print current devices");
     println!("  q: Quit");
 
-    let gs_regex = regex::Regex::new(r"^([gs]) (\d+) (\w+) ([^\s]+)?$").unwrap();
+    let gs_regex = regex::Regex::new(r"^([gs]) (\d+) ([\w\-_]+)( [^\s]+)?$").unwrap();
 
     let mut client: Option<CoAPClient<DtlsConnection>> = None;
     let mut current_devices: Vec<Device> = vec![];
@@ -202,7 +204,7 @@ pub fn run_tui(config: DtlsConfig, my_cid: Uuid, runtime: tokio::runtime::Runtim
                     token.tokens.get(&device.cid).unwrap().clone(),
                     parameter,
                     if request_type == RequestType::Put {
-                        Some(captures.get(4).unwrap().as_str().to_string())
+                        Some(captures.get(4).unwrap().as_str().trim().to_string())
                     } else {
                         None
                     },
@@ -287,7 +289,13 @@ fn request_control_token(
         .build();
 
     let response = runtime.block_on(async move { client.send(request).await })?;
-    Ok(serde_json::from_slice(&response.message.payload)?)
+    if let MessageClass::Response(ResponseType::Content) = response.message.header.code {
+        Ok(serde_json::from_slice(&response.message.payload)?)
+    } else {
+        Err(anyhow::anyhow!(
+            String::from_utf8(response.message.payload).unwrap()
+        ))
+    }
 }
 
 fn send_request(

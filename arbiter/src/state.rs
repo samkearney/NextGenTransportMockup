@@ -62,7 +62,10 @@ pub async fn run_state_loop(
                 println!("Control token request received from {}", request.cid);
                 match get_control_token(request, &acl, &jwt_key, &my_cid) {
                     Ok(token) => Response::ControlTokenResponse(token),
-                    Err(e) => Response::Error(HandlingError::bad_request(e)),
+                    Err(e) => {
+                        println!("Error generating control token: {e}");
+                        Response::Error(HandlingError::bad_request(e))
+                    }
                 }
             }
             RequestType::Shutdown => Response::Ok,
@@ -121,7 +124,9 @@ fn get_control_token(
     jwt_key: &EncodingKey,
     arb_cid: &Uuid,
 ) -> anyhow::Result<ControlTokenResponse> {
-    // TODO: Validate with ACL
+    if !validate_request_with_acl(request, acl) {
+        anyhow::bail!("Request not valid with ACL");
+    }
 
     let header = Header::new(Algorithm::ES256);
     let mut response = ControlTokenResponse {
@@ -150,4 +155,26 @@ fn get_control_token(
     }
 
     Ok(response)
+}
+
+fn validate_request_with_acl(request: &ControlTokenRequest, acl: &AclDatabase) -> bool {
+    for entry in &acl.entries {
+        if entry.controller_cids.contains(&request.cid)
+            && request
+                .devices
+                .iter()
+                .all(|dev| entry.device_cids.contains(dev))
+            && request
+                .params_read
+                .iter()
+                .all(|param| entry.parameters.read.contains(param))
+            && request
+                .params_write
+                .iter()
+                .all(|param| entry.parameters.write.contains(param))
+        {
+            return true;
+        }
+    }
+    false
 }
