@@ -4,6 +4,10 @@ CoAP-based mockup for Next Gen Transport task group.
 
 Please excuse the relatively poor quality of the code. This was mostly written hackathon-style in the context of the ESTA/NATEAC summer meetings in July 2024.
 
+## Slides
+
+The slides that were presented at the Next-Gen Transport task group meeting on 12 July 2024 are in the `slides` directory.
+
 ## Building
 
 Building and running requires a Rust toolchain. You can install it from [here](https://www.rust-lang.org/tools/install).
